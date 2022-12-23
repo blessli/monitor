@@ -11,6 +11,8 @@ import (
 	"github.com/coocood/freecache"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/patrickmn/go-cache"
+	gocache "github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -20,6 +22,7 @@ var (
 	CustomCollector  *prometheus.HistogramVec
 	CustomCollector2 *prometheus.GaugeVec
 	cacheInstance    *freecache.Cache
+	cacheInstance2   *gocache.Cache
 	cacheValue       = getTestCacheValue()
 	cacheSize        = 0
 )
@@ -34,6 +37,7 @@ func getRandNum() string {
 func getTestCacheValue() []byte {
 	ss := ""
 	for i := 0; i < 1e2; i++ {
+		log.Println(uuid.New().String())
 		ss += uuid.New().String()
 	}
 	cacheValue := []byte(ss)
@@ -43,6 +47,7 @@ func getTestCacheValue() []byte {
 }
 func init() {
 	cacheInstance = freecache.NewCache(5 * 1024 * 1024)
+	cacheInstance2 = cache.New(time.Minute*30, time.Minute*20)
 	engine = gin.New()
 	engine.GET("/metrics", func(c *gin.Context) {
 		h := promhttp.Handler()
@@ -50,7 +55,8 @@ func init() {
 	})
 	NewColleactor()
 	NewColleactor2()
-	pkg.InitPuller(CustomCollector,CustomCollector2)
+	pkg.InitPuller(CustomCollector, CustomCollector2)
+	
 }
 func NewColleactor() {
 	dBuckets := []float64{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000}
@@ -109,6 +115,11 @@ func PingHandler(c *gin.Context) {
 
 func main() {
 	engine.GET("/ping", PingHandler)
+	asyncReport()
+	engine.Run(":8686")
+}
+
+func asyncReport() {
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		for {
@@ -118,7 +129,6 @@ func main() {
 			}
 		}
 	}()
-	engine.Run(":8686")
 }
 
 func report() {
